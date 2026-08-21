@@ -1,0 +1,78 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# SOURCES vs SEEDS (concept note)
+# In THIS repo the raw data is loaded with `dbt seed` (CSV -> table), so staging
+# models `ref()` the seeds. In a REAL job, an EL tool (Fivetran/Airbyte/custom
+# Python like your ingestion repo) lands raw tables in the warehouse, and you'd
+# declare them as SOURCES and use `source()` instead of `ref()`. Example of what
+# that declaration would look like:
+#
+# sources:
+#   - name: raw
+#     schema: raw
+#     tables:
+#       - name: transactions
+#         loaded_at_field: _loaded_at
+#         freshness:               # dbt can alert if data is stale
+#           warn_after: {count: 24, period: hour}
+#       - name: investors
+#
+# Then: `select * from {{ source('raw','transactions') }}`
+# `source()` and `ref()` both feed the lineage graph and let dbt order the DAG.
+# ---------------------------------------------------------------------------
+
+models:
+  - name: stg_investors
+    description: "Cleaned investor records, one row per investor."
+    columns:
+      - name: investor_id
+        description: "Primary key."
+        data_tests: [unique, not_null]
+      - name: state
+        data_tests:
+          - not_null
+
+  - name: stg_funds
+    description: "Cleaned fund/offering records, one row per fund."
+    columns:
+      - name: fund_id
+        data_tests: [unique, not_null]
+      - name: asset_class
+        data_tests:
+          - accepted_values:
+              values: ['Real Estate','Private Credit','Private Equity','Art','Legal Finance','Short-Term Notes']
+
+  - name: stg_transactions
+    description: "Cleaned cash-flow events. Grain: one row per transaction."
+    columns:
+      - name: transaction_id
+        data_tests: [unique, not_null]
+      - name: txn_type
+        data_tests:
+          - accepted_values:
+              values: ['subscription','capital_call','distribution','redemption','fee']
+      - name: investor_id
+        data_tests:
+          - relationships:            # referential integrity to the investor dim source
+              to: ref('stg_investors')
+              field: investor_id
+      - name: fund_id
+        data_tests:
+          - relationships:
+              to: ref('stg_funds')
+              field: fund_id
+
+  - name: stg_nav_monthly
+    description: "Cleaned monthly NAV snapshots. Grain: one row per fund per month."
+    columns:
+      - name: nav_per_unit
+        data_tests: [not_null]
+
+  - name: stg_investor_status_updates
+    description: "Raw status feed (contains intentional duplicate rows)."
+    columns:
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['Pending','Accredited','Non-Accredited','Suspended']

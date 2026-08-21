@@ -1,0 +1,12 @@
+# Local DuckDB profile — no cloud warehouse needed.
+# We keep profiles.yml IN the project and point dbt at it with:
+#     dbt build --profiles-dir .
+# (In real jobs this lives in ~/.dbt/ and holds credentials read from env vars,
+#  never committed. Here it's committed only because DuckDB is a local file.)
+willow:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: willow_dbt.duckdb   # created in the project root on first run
+      threads: 4

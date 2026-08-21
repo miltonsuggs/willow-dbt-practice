@@ -1,0 +1,44 @@
+name: 'willow'
+version: '1.0.0'
+config-version: 2
+
+profile: 'willow'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Materialization strategy by layer (a key dbt concept — see README):
+#   staging      -> views  (cheap, always-fresh passthrough/cleaning)
+#   intermediate -> ephemeral (inlined CTEs; no warehouse object)
+#   marts        -> tables (queried often; pay build cost once, read fast)
+models:
+  willow:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: table
+
+seeds:
+  willow:
+    +schema: raw
+    # give the seed columns explicit types so DuckDB doesn't guess
+    investor_status_updates:
+      +column_types:
+        updated_at: timestamp
+    nav_monthly:
+      +column_types:
+        as_of_month: date
+    transactions:
+      +column_types:
+        txn_date: date

@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: "Conformed calendar dimension; role-playable (trade/settle date)."
+    columns:
+      - name: date_key
+        description: "Surrogate key (YYYYMMDD integer)."
+        data_tests: [unique, not_null]
+      - name: date_day
+        data_tests: [unique, not_null]
+
+  - name: dim_investor
+    description: "Investor dimension, one row per investor (current attributes)."
+    columns:
+      - name: investor_key
+        data_tests: [unique, not_null]
+      - name: investor_id
+        description: "Natural/business key."
+        data_tests: [unique, not_null]
+
+  - name: dim_fund
+    description: "Fund/offering dimension, one row per fund."
+    columns:
+      - name: fund_key
+        data_tests: [unique, not_null]
+      - name: fund_id
+        data_tests: [unique, not_null]
+
+  - name: fct_cash_flow
+    description: >
+      Transactional fact. Grain: one row per transaction. Measures amount and
+      cash_flow are fully additive.
+    columns:
+      - name: transaction_id
+        description: "Grain of the table; also a degenerate dimension."
+        data_tests: [unique, not_null]
+      - name: investor_key
+        data_tests:
+          - relationships:
+              to: ref('dim_investor')
+              field: investor_key
+      - name: fund_key
+        data_tests:
+          - relationships:
+              to: ref('dim_fund')
+              field: fund_key
+      - name: cash_flow
+        data_tests: [not_null]
+
+  - name: fct_position_monthly
+    description: >
+      Periodic snapshot fact. Grain: one row per fund per month. nav_per_unit is
+      SEMI-ADDITIVE (never sum across months).
+    columns:
+      - name: nav_per_unit
+        data_tests: [not_null]
+      - name: fund_key
+        data_tests:
+          - relationships:
+              to: ref('dim_fund')
+              field: fund_key

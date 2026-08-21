@@ -1,0 +1,16 @@
+# docker-compose.yml — run dbt in a container without long commands.
+#
+#   docker compose run --rm dbt                      # default: dbt build
+#   docker compose run --rm dbt dbt test             # just the tests
+#   docker compose run --rm dbt dbt snapshot         # (re)build the SCD2 snapshot
+#
+# The volume mount maps your project into the container so the resulting
+# willow_dbt.duckdb and target/ artifacts appear in your working directory.
+services:
+  dbt:
+    build: .
+    image: willow-dbt
+    volumes:
+      - .:/app
+    environment:
+      DBT_PROFILES_DIR: /app

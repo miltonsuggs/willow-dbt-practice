@@ -14,34 +14,70 @@ code doubles as study notes.
 
 ---
 
-## Quick start
+## Setup — pick ONE of three paths
+
+dbt is a Python package, so you manage its environment like any other. Use **uv**
+(recommended — fast, and pins the exact dbt version), plain pip, or **Docker**
+(matches how dbt runs on a scheduler in production).
+
+Common to all paths: the `--profiles-dir .` flag (or `DBT_PROFILES_DIR`) tells
+dbt to use the `profiles.yml` in this repo, which points at a local DuckDB file.
+In a real job that file lives in `~/.dbt/` with credentials from env vars.
+
+### Path A — uv (recommended)
+
+Install uv once:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+Then:
+```bash
+uv sync                                  # creates .venv, installs dbt + adapter from the lock
+uv run dbt build --profiles-dir .        # seeds -> models -> tests -> snapshot
+```
+Run pieces individually:
+```bash
+uv run dbt seed     --profiles-dir .     # load the CSVs into DuckDB
+uv run dbt run      --profiles-dir .     # build staging/intermediate/marts
+uv run dbt test     --profiles-dir .     # run all data tests
+uv run dbt snapshot --profiles-dir .     # build/refresh the SCD2 snapshot
+uv run dbt docs generate --profiles-dir . && uv run dbt docs serve --profiles-dir .
+```
+
+### Path B — plain pip + venv
 
 ```bash
-git clone <your-repo-url> && cd willow-dbt
-python -m venv .venv && source .venv/bin/activate      # optional
-pip install -r requirements.txt
-
-# build everything: load seeds -> run models -> run tests -> build snapshot
+python -m venv .venv && source .venv/bin/activate
+pip install dbt-core dbt-duckdb duckdb    # (or: pip install -e . reads pyproject.toml)
 dbt build --profiles-dir .
 ```
 
-`dbt build` runs seeds, models, tests, and snapshots in dependency order. To run
-pieces individually:
+### Path C — Docker (containerized dbt — production pattern)
+
+Containerized dbt is how transformations run on a schedule (Airflow/Dagster/CI):
+a pinned dbt version + adapter + your project, identical every run. Needs Docker.
 
 ```bash
-dbt seed     --profiles-dir .     # load the CSVs into DuckDB
-dbt run      --profiles-dir .     # build staging/intermediate/marts
-dbt test     --profiles-dir .     # run all data tests
-dbt snapshot --profiles-dir .     # build/refresh the SCD2 snapshot
-dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .   # lineage graph + docs
+docker build -t willow-dbt .                          # build the image
+docker compose run --rm dbt                           # default: dbt build
+docker compose run --rm dbt dbt test                  # just the tests
+docker compose run --rm dbt dbt snapshot              # (re)build the SCD2 snapshot
 ```
+The compose service mounts your project into the container (`.:/app`) and sets
+`DBT_PROFILES_DIR=/app`, so the resulting `willow_dbt.duckdb` and `target/`
+(docs, compiled SQL) appear in your working directory. Without compose:
+```bash
+docker run --rm -v "$PWD":/app willow-dbt dbt build
+```
+The `Dockerfile` starts from `python:3.12-slim`, copies in `uv`, installs the
+**locked** deps in a cached layer, then copies the project — so code edits
+rebuild in seconds while dependency installs are cached.
 
-> The `--profiles-dir .` flag tells dbt to use the `profiles.yml` in this repo
-> (which points at a local DuckDB file). In a real job that file lives in
-> `~/.dbt/` and holds credentials from env vars.
+> **In a Codespace**, Docker is preinstalled (Path C works immediately) and uv
+> installs in seconds (Path A). Use uv for day-to-day work; use Docker to
+> practice — and demonstrate — the containerized-dbt workflow.
 
 Inspect results with DuckDB:
-
 ```bash
 duckdb willow_dbt.duckdb
 -- e.g.  select * from snapshots.investor_status_snapshot order by investor_id limit 5;
@@ -117,8 +153,14 @@ the same idempotency idea as the Python repo's watermark/upsert.
   mechanics, not just click the button. Start there if SCD is the concept you
   most want to master.
 
+## Environment files
+- `pyproject.toml` — declares dbt-core, dbt-duckdb, duckdb; uv reads this.
+- `uv.lock` — exact pinned versions (commit it; it's what makes builds
+  reproducible). `.venv/` is gitignored and rebuilt by `uv sync`.
+- `Dockerfile`, `docker-compose.yml`, `.dockerignore` — containerized dbt.
+
 ## Notes
 - `dbt 1.12` prints a harmless deprecation warning about generic-test argument
   syntax; the tests still pass. Safe to ignore.
-- `target/`, `dbt_packages/`, and `*.duckdb` are gitignored — rebuilt by
+- `target/`, `dbt_packages/`, `logs/`, and `*.duckdb` are gitignored — rebuilt by
   `dbt build`.

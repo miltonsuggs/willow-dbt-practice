@@ -1,0 +1,15 @@
+[project]
+name = "willow-dbt"
+version = "1.0.0"
+description = "dbt project: dimensional modeling, tests, snapshots, and an SCD deep dive on a synthetic private-markets dataset"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dbt-core>=1.9",
+    "dbt-duckdb>=1.9",
+    "duckdb>=1.0",
+]
+
+# uv manages the Python environment that dbt runs in. `uv sync` installs these
+# into a managed .venv and writes uv.lock, pinning the EXACT dbt + adapter
+# versions — important because dbt behavior can change between versions.

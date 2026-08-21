@@ -1,0 +1,14 @@
+# dbt build artifacts
+target/
+dbt_packages/
+logs/
+# local warehouse (rebuilt by dbt build)
+*.duckdb
+*.duckdb.wal
+scd.db
+# python / os / editor
+.venv/
+venv/
+__pycache__/
+.DS_Store
+.vscode/
